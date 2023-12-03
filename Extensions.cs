@@ -284,7 +284,7 @@ namespace BBCRAdds.Extensions
 			return vec;
 		}
 
-		public static RoomData CopyRoomData(this RoomData tarRoom, bool cloneActivity = false)
+		public static RoomData CopyRoomData(this RoomData tarRoom, bool cloneActivity = false) // This boolean will never be used in code, it's for when I add rooms inside the game, so I don't have to search for the activity aswell
 		{
 			return new RoomData
 			{
