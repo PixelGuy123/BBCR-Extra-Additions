@@ -69,7 +69,7 @@ namespace BBCRAdds.Patches
 			___sceneObject = Singleton<CoreGameManager>.Instance.sceneObject;
 			MapDataHolder.ReadDataFromFolder(___sceneObject.levelAsset != null ? ___sceneObject.levelAsset.name + MapDataHolder.levelAssetTag : ___sceneObject.levelContainer.name + MapDataHolder.levelContainerTag); // Read the data and substitute everything on this level
 
-			if (ClassicLoadingScreenPatch.i != null)
+			if (ClassicLoadingScreenPatch.i != null) // TO-DO: When mod initialization loads the data, remove this
 			{
 				ClassicLoadingScreenPatch.i.transform.Find("Text").GetChild(0).GetComponent<TextMeshProUGUI>().text = defaultloadthingy;
 			}
@@ -92,7 +92,7 @@ namespace BBCRAdds.Patches
 		{
 			EnvironmentData.ec = ___ec;
 
-			if (!ContentManager.i.DebugMode) return;
+			if (!ContentManager.i.DebugMode) return; // Editor hud down here
 
 
 			var hud = Singleton<CoreGameManager>.Instance.GetHud(0);
@@ -114,7 +114,7 @@ namespace BBCRAdds.Patches
 	{
 		private static void Postfix(HudManager __instance)
 		{
-			if (!ContentManager.i.DebugMode) return;
+			if (!ContentManager.i.DebugMode) return; // All below being editor
 
 			if (text == null)
 			{
@@ -225,7 +225,7 @@ namespace BBCRAdds.Patches
 		readonly static Vector3 pos = Vector3.up * 175f;
 	}
 
-	[HarmonyPatch(typeof(ClassicLoadScreen), "OnEnable")]
+	[HarmonyPatch(typeof(ClassicLoadScreen), "OnEnable")] // TO-DO: Remove this aswell when data loads through initialization
 	public class ClassicLoadingScreenPatch
 	{
 		private static void Prefix(ClassicLoadScreen __instance)
@@ -249,7 +249,7 @@ namespace BBCRAdds.Patches
 			if (initialized) return;
 			initialized = true;
 
-			MapDataHolder.ConvertAllAssetsInGameToFiles();
+			MapDataHolder.ConvertAllAssetsInGameToFiles(); // This normally shouldn't work, but if some genius decide to mess up with the files, it'll create the ones based on the default map
 		}
 
 		static bool initialized = false;
@@ -259,14 +259,14 @@ namespace BBCRAdds.Patches
 	internal class ThereWasNoErrorStfu
 	{
 		private static Exception Finalizer() // Shut the apply map, to do your job >:(
-		{
+		{				// Why is this even called, the map isn't enabled on this game, omg
 			return null;
 		}
 	}
 
 	// ------------- Gameplay Patches ---------------
 	[HarmonyPatch(typeof(ClassicSwingDoor), "OnTriggerEnter")]
-	internal class YouNeedTwoNotebooksToBeAbleToOpenTheseDoors // Just let it spam, it's fun lol
+	internal class YouNeedTwoNotebooksToBeAbleToOpenTheseDoors // Just let it spam, it's funny lol
 	{
 		private static bool Prefix(Collider other, SwingDoor ___door, SoundObject ___audYouNeed)
 		{
