@@ -66,7 +66,7 @@ namespace BBCRAdds.Main
 			}
 		}
 
-		static void ReadDataForAsset(string file, ref LevelData asset) // Yes, I made this an IEnumerator to not lag out the game when loading the file, since people can confunde it with a crash
+		static void ReadDataForAsset(string file, ref LevelData asset)
 		{
 
 			//Some clear up before reading data so it doesn't mess up
