@@ -192,7 +192,7 @@ namespace BBCRAdds.Main
 									try
 									{
 										pos = objData[1].Split(':');
-										obj.position = pos.ToVector3(); // Yeah it is quite unsafe, but there's no way it wouldn't find these values
+										obj.position = pos.ToVector3();
 										pos = objData[2].Split(':');
 										obj.rotation = pos.ToRotation();
 									}
@@ -254,7 +254,7 @@ namespace BBCRAdds.Main
 								}
 
 								if (isClone)
-									asset.rooms.Add(room); // If it is clone, add to add later after this ForEach (to not mess up duh)
+									asset.rooms.Add(room);
 
 								lidx++;
 								data = rd.ReadLine(); // Basically just name
@@ -302,7 +302,7 @@ namespace BBCRAdds.Main
 
 		}
 
-		public static void ReadDataFromFolder(string targetAsset)
+		public static void ReadDataFromFolder(string targetAsset) // TO-DO: Makes it load all of the data in the mod initialization just so it doesn't repeat the same process everytime
 		{
 
 			CreateDefaultFolderIfNotExistent();
