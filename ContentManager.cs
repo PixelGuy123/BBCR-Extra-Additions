@@ -26,7 +26,7 @@ namespace BBCRAdds.Main
 		/// </summary>
 		/// <param name="name"></param>
 		/// <returns></returns>
-		public static LevelAsset GetAsset(string name = MainAssetName) => Resources.FindObjectsOfTypeAll<LevelAsset>().First(x => x.name == name);
+		public static LevelAsset GetAsset(string name = MainAssetName) => Resources.FindObjectsOfTypeAll<LevelAsset>().First(x => x.name == name); // TO-DO: Remove this, it is useless
 		
 
 		public const string MainAssetName = "ClassicRemasteredV2";
