@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using MTM101BaldAPI;
 using BBCRAdds.Extensions;
+using System.Linq;
 
 namespace BBCRAdds.Patches
 {
@@ -132,31 +133,31 @@ namespace BBCRAdds.Patches
 			var playerPos = IntVector2.GetGridPosition(Singleton<CoreGameManager>.Instance.GetPlayer(0).transform.position); // just register the player pos for later usage
 
 			string sData = new string(data);
-			text.text = sData + $"\nsaved: {beenSaved}\nCurrent Room Type:{(room != null ? room.name : "none")}\n Pos: {playerPos.x},{playerPos.z}";
+			text.text = sData + $"\nsaved: {beenSaved}\nCurrent Room Type:{(room != null ? room.name : "none")}\n Pos: {playerPos.x},{playerPos.z}\n Editor Mode: {editMode}";
 
-			if (Input.GetKeyDown(KeyCode.Alpha1)) // A 4-bit flag (for tiles)
+			if (Input.GetKeyDown(KeyCode.Alpha1) && editMode) // A 4-bit flag (for tiles)
 				data[0] = data[0] == '0' ? '1' : '0';
-			if (Input.GetKeyDown(KeyCode.Alpha2))
+			if (Input.GetKeyDown(KeyCode.Alpha2) && editMode)
 				data[1] = data[1] == '0' ? '1' : '0';
-			if (Input.GetKeyDown(KeyCode.Alpha3))
+			if (Input.GetKeyDown(KeyCode.Alpha3) && editMode)
 				data[2] = data[2] == '0' ? '1' : '0';
-			if (Input.GetKeyDown(KeyCode.Alpha4))
+			if (Input.GetKeyDown(KeyCode.Alpha4) && editMode)
 				data[3] = data[3] == '0' ? '1' : '0';
 
 			
 
-			if (Input.GetKeyDown(KeyCode.UpArrow)) // Switch the room inside the room list
+			if (Input.GetKeyDown(KeyCode.UpArrow) && editMode) // Switch the room inside the room list
 			{
 				roomIdx++;
 				roomIdx %= EnvironmentData.ec.rooms.Count;
 			}
-			if (Input.GetKeyDown(KeyCode.DownArrow)) // Switch the room inside the room list
+			if (Input.GetKeyDown(KeyCode.DownArrow) && editMode) // Switch the room inside the room list
 			{
 				roomIdx--;
 				roomIdx %= EnvironmentData.ec.rooms.Count;
 				if (roomIdx < 0) roomIdx = EnvironmentData.ec.rooms.Count - 1;
 			}
-			if (Input.GetKeyDown(KeyCode.C)) // Copy the current tile's room into reference
+			if (Input.GetKeyDown(KeyCode.C) && editMode) // Copy the current tile's room into reference
 			{
 				var r = EnvironmentData.ec.TileFromPos(playerPos);
 				if (r != null && r.room != null)
@@ -165,12 +166,21 @@ namespace BBCRAdds.Patches
 
 			room = EnvironmentData.ec.rooms[roomIdx];
 
-			if (Input.GetKeyDown(KeyCode.R)) // Creates a roomData based on the current one (to easily add it
+			if (Input.GetKeyDown(KeyCode.R) && editMode) // Creates a roomData based on the current one (to easily add it
 			{
 				var sceneObject = Singleton<CoreGameManager>.Instance.sceneObject;
 				if (sceneObject.levelAsset != null)
 				{
-					var foundRoom = sceneObject.levelAsset.rooms.Find(x => x.name.Contains(room.name));
+					var foundRoom = sceneObject.levelAsset.rooms.Find(x => room.name.Contains(x.name));
+					if (foundRoom != default)
+					{
+						Debug.Log("Created Room!");
+						roomDatas.Add(foundRoom.CopyRoomData(true));
+					}
+				}
+				else if (sceneObject.levelContainer != null)
+				{
+					var foundRoom = sceneObject.levelContainer.rooms.Find(x => room.name.Contains(x.name));
 					if (foundRoom != default)
 					{
 						Debug.Log("Created Room!");
@@ -179,20 +189,22 @@ namespace BBCRAdds.Patches
 				}
 			}
 
-			if (Input.GetKeyDown(KeyCode.L)) // Creates lighting at current position
+			if (Input.GetKeyDown(KeyCode.L) && editMode) // Creates lighting at current position
 			{
 				Debug.Log("Created Lighting!");
-				lightDatas.Add(new LightSourceData()
+				var l = new LightSourceData()
 				{
-					prefab = null,
+					prefab = Resources.FindObjectsOfTypeAll<Transform>().First(x => x.name == "FluorescentLight"), // Get this one by default, must change manually in UE if needed
 					position = playerPos,
 					color = new Color(1f, 1f, 1f, 0f),
-					strength = 1
-				});
+					strength = 10
+				};
+				Singleton<CoreGameManager>.Instance.sceneObject.levelAsset?.lights.Add(l); // Both, if one doesn't work, it'll go to the other anyways
+				Singleton<CoreGameManager>.Instance.sceneObject.levelContainer?.lights.Add(l);
 			}
 
 
-			if (Input.GetKeyDown(KeyCode.Z)) // Create tile
+			if (Input.GetKeyDown(KeyCode.Z) && editMode) // Create tile
 			{
 				var type = Convert.ToInt32(sData, 2);
 				EnvironmentData.ec.CreateTile(type, room.transform, playerPos, room, true);
@@ -217,7 +229,7 @@ namespace BBCRAdds.Patches
 				}
 				beenSaved = false;
 			}
-			if (Input.GetKeyDown(KeyCode.X)) // Destroy tile
+			if (Input.GetKeyDown(KeyCode.X) && editMode) // Destroy tile
 			{
 				if (EnvironmentData.ec.tiles[playerPos.x, playerPos.z] != null)
 				{
@@ -226,7 +238,7 @@ namespace BBCRAdds.Patches
 				}
 				beenSaved = false;
 			}
-			if (Input.GetKeyDown(KeyCode.J)) // Saves data
+			if (Input.GetKeyDown(KeyCode.J) && editMode) // Saves data
 			{
 				beenSaved = true;
 				var sceneObject = Singleton<CoreGameManager>.Instance.sceneObject;
@@ -235,6 +247,8 @@ namespace BBCRAdds.Patches
 				else if (sceneObject.levelContainer != null)
 					MapDataHolder.UpdateDataIntoAsset(ref sceneObject.levelContainer, sceneObject.levelContainer.levelSize, tilesToSave.ToArray(), true);
 			}
+			if (Input.GetKeyDown(KeyCode.P))
+				editMode = !editMode;
 		}
 
 		static TextMeshProUGUI text = null;
@@ -251,13 +265,13 @@ namespace BBCRAdds.Patches
 
 		readonly static Vector3 pos = Vector3.up * 175f;
 
+		static bool editMode = false;
+
 
 
 		// Here is the storage of references, it'll basically create the necessary stuff such as room datas for example and store them in lists, so I can access through UE
 
 		readonly static List<RoomData> roomDatas = new List<RoomData>();
-
-		readonly static List<LightSourceData> lightDatas = new List<LightSourceData>();
 	}
 
 	[HarmonyPatch(typeof(ClassicLoadScreen), "OnEnable")] // TO-DO: Remove this aswell when data loads through initialization

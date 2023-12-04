@@ -2,11 +2,10 @@
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
-using System.Collections;
 using System.IO;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Timeline;
+using MTM101BaldAPI;
 
 namespace BBCRAdds.Main
 {
@@ -32,7 +31,7 @@ namespace BBCRAdds.Main
 			}
 		}
 
-		public static void ConvertAllAssetsInGameToFiles()
+		public static void ConvertAllAssetsInGameToFiles() // just pick every asset and convert into a file
 		{
 			foreach (var asset in Resources.FindObjectsOfTypeAll<LevelAsset>())
 			{
@@ -45,12 +44,19 @@ namespace BBCRAdds.Main
 			}
 		}
 
-		static T FilterOutWhichOne<T>(string targetName, bool findByObject = false) where T : UnityEngine.Object // Yes, an IEnumerable, I don't think I have to convert every Where() into an array
+		static T FilterOutWhichOne<T>(string targetName, bool findByObject = false, bool defaultToFindObjectIfRequired = false) where T : UnityEngine.Object // Yes, an IEnumerable, I don't think I have to convert every Where() into an array
 		{
 			IEnumerable<T> foundings = findByObject ? UnityEngine.Object.FindObjectsOfType<T>(true).Where(x => x.name == targetName) : Resources.FindObjectsOfTypeAll<T>().Where(x => x.name == targetName);
 
 
-			if (foundings.Count() == 0) return default; // if array empty, just return default
+			if (foundings.Count() == 0)
+			{
+				if (!findByObject & defaultToFindObjectIfRequired)
+				{
+					return FilterOutWhichOne<T>(targetName, true); // Basically, if not found in resources, switch to Object search
+				}
+				return default; // if array empty, just return default
+			}
 
 			if (typeof(T) == typeof(Transform)) // If it is selecting a transform, to not collide with other types
 			{
@@ -70,7 +76,15 @@ namespace BBCRAdds.Main
 			}
 		}
 
-		static void ReadDataForAsset(string file, ref LevelData asset)
+		//=======================================================
+		//=======================================================
+		//=======================================================
+		//=============Level Loading Process Below===============
+		//=======================================================
+		//=======================================================
+		//=======================================================
+
+		static void ReadDataForAsset(string file, ref LevelData asset) // Actual method that reads the file
 		{
 			
 
@@ -219,14 +233,11 @@ namespace BBCRAdds.Main
 								{
 									var objData = data.Split(';');
 
-									var itmObj = FilterOutWhichOne<ItemObject>(objData[0]);
+									var itmObj = FilterOutWhichOne<ItemObject>(objData[0], defaultToFindObjectIfRequired:true);
 
-									if (itmObj == default) // If true, it is a custom item and should be hidden in DontDestroyAtLoad
-									{
-										itmObj = FilterOutWhichOne<ItemObject>(objData[0], true);
-										if (itmObj == default) // Another safe measure just in case
-											goto obj_endLine2;
-									}
+									if (itmObj == default) // Safe measure just in case
+										goto obj_endLine2;
+									
 
 									pos = objData[1].Split(':');
 
@@ -334,6 +345,171 @@ namespace BBCRAdds.Main
 							}
 
 							break;
+
+						case defaultPrefix + windowTag:
+
+							asset.windows.Clear(); // Clears out to add new lighting
+
+							data = rd.ReadLine();
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name (WindowObject), IntVector2, Direction
+							{
+								var wData = data.Split(';');
+								asset.windows.Add(new WindowData()
+								{
+									window = FilterOutWhichOne<WindowObject>(wData[0]),
+									position = wData[1].Split(',').ToIntVector2(),
+									direction = wData[2].GetDirFromString()
+								});
+
+
+								data = rd.ReadLine(); // Next line...
+							}
+
+							break;
+
+						case defaultPrefix + tileBasedTag:
+
+							asset.tbos.Clear(); // Clears out to add new lighting
+
+							data = rd.ReadLine();
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name (TileBasedObject), IntVector2, Direction
+							{
+								var wData = data.Split(';');
+								asset.tbos.Add(new TileBasedObjectData
+								{
+									prefab = FilterOutWhichOne<TileBasedObject>(wData[0]),
+									position = wData[1].Split(',').ToIntVector2(),
+									direction = wData[2].GetDirFromString()
+								});
+
+
+								data = rd.ReadLine(); // Next line...
+							}
+
+							break;
+						case defaultPrefix + eventTag:
+
+							asset.events.Clear(); // Clears out to add new lighting
+
+							var eventData = rd.ReadLine().Split(';'); // All data is here basically
+
+							foreach (var ev in eventData) // RandomEventType
+							{
+								if (Enum.TryParse(ev, out RandomEventType res))
+								{
+									if (res.TryGetFirstInstance(out var v)) // Try to get the instance of course, we don't want to break this, do we? :)
+										asset.events.Add(v);
+								}
+							}
+
+
+							break;
+
+						case defaultPrefix + posterTag:
+
+							asset.posters.Clear(); // Clears out
+
+							data = rd.ReadLine();
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name (PosterObject), IntVector2, Direction
+							{
+								var wData = data.Split(';');
+								asset.posters.Add(new PosterData
+								{
+									poster = FilterOutWhichOne<PosterObject>(wData[0]),
+									position = wData[1].Split(',').ToIntVector2(),
+									direction = wData[2].GetDirFromString()
+								});
+
+
+								data = rd.ReadLine(); // Next line...
+							}
+
+							break;
+
+						case defaultPrefix + buttonTag:
+
+							asset.buttons.Clear(); // Clears out
+
+							data = rd.ReadLine();
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name (GameButton), IntVector2, Direction >> Sublist for receivers: int, int, enum
+							{
+								var wData = data.Split(';');
+
+								data = rd.ReadLine(); // Go to the next line afterwards
+
+								var receivers = new List<ButtonReceiverData>();
+								while (!data.StartsWith(defaultSecondSufix) && !rd.EndOfStream)
+								{
+									var sData = data.Split(',');
+									receivers.Add(new ButtonReceiverData()
+									{
+										receiverIndex = int.Parse(sData[0]),
+										receiverRoom = int.Parse(sData[1]),
+										type = (ButtonReceiverType)Enum.Parse(typeof(ButtonReceiverType), sData[2]) // Since there are just 2 enums, it is expected to always work, no need to tryparse.... right?
+									});
+
+									data = rd.ReadLine();
+								}
+
+								asset.buttons.Add(new ButtonData
+								{
+									prefab = FilterOutWhichOne<GameButton>(wData[0]),
+									position = wData[1].Split(',').ToIntVector2(),
+									direction = wData[2].GetDirFromString(),
+									receivers = receivers
+								});
+
+
+								data = rd.ReadLine(); // Next line...
+							}
+
+							break;
+
+						case defaultPrefix + builderTag:
+
+							asset.builders.Clear(); // Clears out
+
+							data = rd.ReadLine();
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name (ObjectBuilder) >> sublists: List<IntVector2> then List<Direction>
+							{
+								var wData = data.Split(';');
+
+								data = rd.ReadLine(); // Go to the next line afterwards
+
+								var pos = new List<IntVector2>();
+								while (!data.StartsWith(defaultSecondSufix) && !rd.EndOfStream) // Get IntVectors
+								{
+									pos.Add(data.Split(',').ToIntVector2());
+									data = rd.ReadLine();
+								}
+
+								data = rd.ReadLine(); // Go to the next line afterwards
+
+								var dir = new List<Direction>();
+								while (!data.StartsWith(defaultSecondSufix) && !rd.EndOfStream) // Get directions
+								{
+									dir.Add(data.GetDirFromString());
+									data = rd.ReadLine();
+								}
+
+								asset.builders.Add(new ObjectBuilderData()
+								{
+									builder = FilterOutWhichOne<ObjectBuilder>(wData[0]),
+									pos = pos,
+									dir = dir
+								});
+
+
+								data = rd.ReadLine(); // Next line...
+							}
+
+							break;
+
 						default: break;
 
 					}
@@ -343,6 +519,7 @@ namespace BBCRAdds.Main
 
 		}
 
+		// Get all the files in the folder and load them into the game
 		public static void ReadDataFromFolder(string targetAsset) // TO-DO: Makes it load all of the data in the mod initialization just so it doesn't repeat the same process everytime
 		{
 
@@ -395,8 +572,14 @@ namespace BBCRAdds.Main
 			}
 		}
 
-
+		//=======================================================
+		//=======================================================
+		//=======================================================
 		// =============== Level Asset Saving ================
+		//=======================================================
+		//=======================================================
+		//=======================================================
+
 		/// <summary>
 		/// Saves the data into a file inside the default folder
 		/// </summary>
@@ -412,7 +595,7 @@ namespace BBCRAdds.Main
 
 				File.Delete(path); // Deletes the file to be re-created again
 			}
-			Debug.Log(Path.GetFileName(path));
+			Debug.Log($"Saving data from: {Path.GetFileName(path)}");
 			using (StreamWriter writer = new StreamWriter(path))
 			{
 				writer.WriteLine("You can play with the data here, but this will mostly just break the game, so do not :)");
@@ -477,17 +660,91 @@ namespace BBCRAdds.Main
 
 				writer.WriteLine($"{defaultPrefix}{lightTag}");
 				Debug.Log("Saving Lighting");
-				foreach (var light in data.lights)
+				foreach (var light in data.lights) // Saving Lights
 				{
 					writer.WriteLine($"{(light.prefab != null ? light.prefab.name : "null")};{light.position.x},{light.position.z};{light.color.r}:{light.color.g}:{light.color.b}:{light.color.a};{light.strength}");
 				}
 
 				writer.WriteLine(defaultSufix); // Spacing
 
+				writer.WriteLine($"{defaultPrefix}{windowTag}");
+				Debug.Log("Saving Windows");
+
+				foreach (var win in data.windows) // Saving Windows
+				{
+					writer.WriteLine($"{win.window.name};{win.position.x},{win.position.z};{win.direction}");
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
+
+				writer.WriteLine($"{defaultPrefix}{tileBasedTag}");
+				Debug.Log("Saving Tile-Based Objects");
+
+				foreach (var obj in data.tbos) // Saving Tile-Based Objects
+				{
+					writer.WriteLine($"{obj.prefab.name};{obj.position.x},{obj.position.z};{obj.direction}");
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
+
+				writer.WriteLine($"{defaultPrefix}{eventTag}");
+				Debug.Log("Saving Events");
+
+				foreach (var ev in data.events) // Saving Random Events
+				{
+					writer.Write($"{ev.Type};"); // Only write, because only the type is necessary to find the prefab
+				}
+
+
+				writer.WriteLine(defaultSufix); // Spacing
+
+				writer.WriteLine($"{defaultPrefix}{posterTag}");
+				Debug.Log("Saving Posters");
+
+				foreach (var po in data.posters) // Saving Posters
+				{
+					writer.WriteLine($"{po.poster.name};{po.position.x},{po.position.z};{po.direction}");
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
+
+				writer.WriteLine($"{defaultPrefix}{buttonTag}");
+				Debug.Log("Saving Buttons");
+
+				foreach (var b in data.buttons) // Saving Buttons / Note: Receivers are classes, not scriptable objects, require secondaries sufixes
+				{
+					writer.WriteLine($"{b.prefab.name};{b.position.x},{b.position.z};{b.direction}"); // Basic Data
+
+					foreach (var br in b.receivers) // Second list storing the data from receivers (each line is one receiver lol)
+					{
+						writer.WriteLine($"{br.receiverIndex},{br.receiverRoom},{br.type}");
+					}
+					writer.WriteLine(defaultSecondSufix); // Secondary Spacing
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
+
+				writer.WriteLine($"{defaultPrefix}{builderTag}");
+				Debug.Log("Saving Builders");
+
+				foreach (var b in data.builders) // Saving Builders / Note: require 2 sublists, one for IntVector2, and the other for Directions
+				{
+					writer.WriteLine($"{b.builder.name}"); // Basic Data
+					foreach (var i in b.pos)
+					{
+						writer.WriteLine($"{i.x},{i.z}");
+					}
+					writer.WriteLine(defaultSecondSufix); // Secondary Spacing
+					foreach (var d in b.dir)
+					{
+						writer.WriteLine(d);
+					}
+					writer.WriteLine(defaultSecondSufix); // Secondary Spacing
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
 			}
 		}
-
-		// =============== Level Container Saving ===============
 
 		/// <summary>
 		/// Saves the data into a file inside the default folder
@@ -501,9 +758,15 @@ namespace BBCRAdds.Main
 				Directory.CreateDirectory(FolderPath);
 		}
 
+		// Yeah
 		public static string FolderPath => Path.Combine(ContentManager.modPath, "mapData");
+
+		// Some types in constants for easy management
 		const string defaultFileType = ".mapDat", defaultPrefix = "//>>", defaultSufix = "//<<", defaultSecondSufix = "//<><";
-		const string mapSizeTag = "MapSizes", tilesTag = "tiles", roomsTag = "roomsData", doorsTag = "doorsData", exitTag = "exitData", lightTag = "lightingData";
+
+		// Tags (to differ each data type)
+		const string mapSizeTag = "MapSizes", tilesTag = "tiles", roomsTag = "roomsData", doorsTag = "doorsData", exitTag = "exitData", lightTag = "lightingData", windowTag = "windowData", tileBasedTag = "tileBasedObjectData", eventTag = "eventData", posterTag = "posterData",
+			buttonTag = "buttonData", builderTag = "buildersData";
 
 		public const string levelAssetTag = "_LevelAsset", levelContainerTag = "_LevelDataContainer";
 	}

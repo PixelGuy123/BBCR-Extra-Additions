@@ -327,5 +327,21 @@ namespace BBCRAdds.Extensions
 				wallTex = tarRoom.wallTex
 			};
 		}
+
+		/// <summary>
+		/// Quick extension to the Baldi Dev API, to include Random Events
+		/// </summary>
+		/// <param name="en"></param>
+		/// <returns>An random event based on the enum</returns>
+		public static bool TryGetFirstInstance(this RandomEventType en, out RandomEvent @event)
+		{
+			var revent = Resources.FindObjectsOfTypeAll<RandomEvent>().FirstOrDefault(x => x.Type == en);
+			if (revent == default)
+				revent = UnityEngine.Object.FindObjectsOfType<RandomEvent>(true).FirstOrDefault(x => x.Type == en);
+
+			@event = revent;
+
+			return revent != default;
+		}
 	}
 }
