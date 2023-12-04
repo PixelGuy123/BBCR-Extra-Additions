@@ -6,6 +6,7 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Timeline;
 
 namespace BBCRAdds.Main
 {
@@ -44,33 +45,34 @@ namespace BBCRAdds.Main
 			}
 		}
 
-		static T FilterOutWhichOne<T>(T[] foundings, string targetName)
+		static T FilterOutWhichOne<T>(string targetName, bool findByObject = false) where T : UnityEngine.Object // Yes, an IEnumerable, I don't think I have to convert every Where() into an array
 		{
-			if (foundings.Length == 0) return default; // if array empty, just return default
+			IEnumerable<T> foundings = findByObject ? UnityEngine.Object.FindObjectsOfType<T>(true).Where(x => x.name == targetName) : Resources.FindObjectsOfTypeAll<T>().Where(x => x.name == targetName);
+
+
+			if (foundings.Count() == 0) return default; // if array empty, just return default
 
 			if (typeof(T) == typeof(Transform)) // If it is selecting a transform, to not collide with other types
 			{
 				switch (targetName)
 				{
 					case "Bus":
-						return foundings[1];
+						return foundings.ElementAt(1);
 
 					default:
-						return foundings[0];
+						return foundings.First();
 				}
 			}
 
 			else
 			{
-				return foundings[0];
+				return foundings.First();
 			}
 		}
 
 		static void ReadDataForAsset(string file, ref LevelData asset)
 		{
-
-			//Some clear up before reading data so it doesn't mess up
-			asset.tile = new TileData[0];
+			
 
 			Debug.Log("Reading: " + Path.GetFileName(file));
 
@@ -98,6 +100,7 @@ namespace BBCRAdds.Main
 
 						case defaultPrefix + tilesTag:
 							data = rd.ReadLine(); // Begins with a readline to skip the first part
+							asset.tile = new TileData[0]; // Clears out
 
 							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // While it doesn't end, read the tiles and put inside the levelAsset lol
 							{
@@ -156,7 +159,7 @@ namespace BBCRAdds.Main
 
 									room.activity = new ActivityData()
 									{
-										prefab = FilterOutWhichOne(Resources.FindObjectsOfTypeAll<Activity>().Where(x => x.name == acData[0]).ToArray(), acData[0]),
+										prefab = FilterOutWhichOne<Activity>(acData[0]),
 										position = acData[1].Split(':').ToVector3(),
 										direction = acData[2].GetDirFromString()
 									};
@@ -178,7 +181,7 @@ namespace BBCRAdds.Main
 									{
 										room.basicObjects.Add(new BasicObjectData()
 										{
-											prefab = FilterOutWhichOne(Resources.FindObjectsOfTypeAll<Transform>().Where(x => x.name == objData[0]).ToArray(), objData[0]),
+											prefab = FilterOutWhichOne<Transform>(objData[0]),
 											position = pos.ToVector3(),
 											rotation = rot.ToRotation()
 										});
@@ -188,7 +191,7 @@ namespace BBCRAdds.Main
 
 
 									var obj = room.basicObjects[idx];
-									obj.prefab = FilterOutWhichOne(Resources.FindObjectsOfTypeAll<Transform>().Where(x => x.name == objData[0]).ToArray(), objData[0]);
+									obj.prefab = FilterOutWhichOne<Transform>(objData[0]);
 									try
 									{
 										pos = objData[1].Split(':');
@@ -216,11 +219,11 @@ namespace BBCRAdds.Main
 								{
 									var objData = data.Split(';');
 
-									var itmObj = FilterOutWhichOne(Resources.FindObjectsOfTypeAll<ItemObject>().Where(x => x.name == objData[0]).ToArray(), objData[0]);
+									var itmObj = FilterOutWhichOne<ItemObject>(objData[0]);
 
 									if (itmObj == default) // If true, it is a custom item and should be hidden in DontDestroyAtLoad
 									{
-										itmObj = FilterOutWhichOne(UnityEngine.Object.FindObjectsOfType<ItemObject>(true).Where(x => x.name == objData[0]).ToArray(), objData[0]);
+										itmObj = FilterOutWhichOne<ItemObject>(objData[0], true);
 										if (itmObj == default) // Another safe measure just in case
 											goto obj_endLine2;
 									}
@@ -264,32 +267,70 @@ namespace BBCRAdds.Main
 							break;
 						case defaultPrefix + doorsTag:
 							data = rd.ReadLine();
-							int i = 0;
+
+							asset.doors.Clear(); // Clears out doors
 
 
-							while (!data.StartsWith(defaultSecondSufix) && !rd.EndOfStream)
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream)
 							{
 								var doorData = data.Split(';');
-								sizes = doorData[1].Split(','); // Position, not size btw
 
-								if (i >= asset.doors.Count)
-								{
-									asset.doors.Add(new DoorData(int.Parse(doorData[3]),
-										FilterOutWhichOne(Resources.FindObjectsOfTypeAll<Door>().Where(x => x.name == doorData[0]).ToArray(), doorData[0]),
-										sizes.ToIntVector2(), doorData[2].GetDirFromString()));
-									goto door_endLine;
-								}
+								asset.doors.Add(new DoorData(int.Parse(doorData[3]),
+											FilterOutWhichOne<Door>(doorData[0]),
+											doorData[1].Split(',').ToIntVector2(), doorData[2].GetDirFromString()));
 
-								var door = asset.doors[i];
-								door.doorPre = FilterOutWhichOne(Resources.FindObjectsOfTypeAll<Door>().Where(x => x.name == doorData[0]).ToArray(), doorData[0]);
-								door.position = sizes.ToIntVector2();
-								door.dir = doorData[2].GetDirFromString();
-								door.roomId = int.Parse(doorData[3]);
-
-							door_endLine:
 								data = rd.ReadLine();
-								i++;
 
+							}
+
+							break;
+
+						case defaultPrefix + exitTag:
+							asset.exits.Clear(); // Clears out to add new exits
+
+							data = rd.ReadLine(); // Just reads out first line (which is data)
+
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name, IntVector2, Direction, Boolean (is spawn)
+							{
+								
+								var exitData = data.Split(';');
+								Debug.Log("Reading Exit: " + exitData[0]);
+
+								asset.exits.Add(new ExitData()
+								{
+									prefab = FilterOutWhichOne<Elevator>(exitData[0]), // Prefab
+									position = exitData[1].Split(',').ToIntVector2(), // pos
+									direction = exitData[2].GetDirFromString(), // dir
+									spawn = bool.Parse(exitData[3]) // is spawn
+								});
+
+								data = rd.ReadLine(); // Next line...
+							}
+
+
+							break;
+
+						case defaultPrefix + lightTag:
+							asset.lights.Clear(); // Clears out to add new lighting
+
+							data = rd.ReadLine();
+
+							while (!data.StartsWith(defaultSufix) && !rd.EndOfStream) // Prefab Name, IntVector2, Color, Int (Strength)
+							{
+
+								var light = data.Split(';');
+
+								asset.lights.Add(new LightSourceData()
+								{
+									prefab = light[0] != "null" ? FilterOutWhichOne<Transform>(light[0]) : null, // forgot lights can also have null prefabs
+									position = light[1].Split(',').ToIntVector2(),
+									color = light[2].Split(':').ToColor(),
+									strength = int.Parse(light[3])
+								});
+								
+
+								data = rd.ReadLine(); // Next line...
 							}
 
 							break;
@@ -424,6 +465,25 @@ namespace BBCRAdds.Main
 
 				writer.WriteLine(defaultSufix); // Spacing
 
+
+				writer.WriteLine($"{defaultPrefix}{exitTag}");
+				Debug.Log("Saving Exits");
+				foreach (var exit in data.exits) // Saving Exits
+				{
+					writer.WriteLine($"{exit.prefab.name};{exit.position.x},{exit.position.z};{exit.direction};{exit.spawn}");
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
+
+				writer.WriteLine($"{defaultPrefix}{lightTag}");
+				Debug.Log("Saving Lighting");
+				foreach (var light in data.lights)
+				{
+					writer.WriteLine($"{(light.prefab != null ? light.prefab.name : "null")};{light.position.x},{light.position.z};{light.color.r}:{light.color.g}:{light.color.b}:{light.color.a};{light.strength}");
+				}
+
+				writer.WriteLine(defaultSufix); // Spacing
+
 			}
 		}
 
@@ -443,8 +503,7 @@ namespace BBCRAdds.Main
 
 		public static string FolderPath => Path.Combine(ContentManager.modPath, "mapData");
 		const string defaultFileType = ".mapDat", defaultPrefix = "//>>", defaultSufix = "//<<", defaultSecondSufix = "//<><";
-		const string mapSizeTag = "MapSizes", tilesTag = "tiles", roomsTag = "roomsData", doorsTag = "doorsData";
-		const string roomCloneTag = "clone_";
+		const string mapSizeTag = "MapSizes", tilesTag = "tiles", roomsTag = "roomsData", doorsTag = "doorsData", exitTag = "exitData", lightTag = "lightingData";
 
 		public const string levelAssetTag = "_LevelAsset", levelContainerTag = "_LevelDataContainer";
 	}

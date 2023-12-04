@@ -5,6 +5,7 @@ using TMPro;
 using System;
 using System.Collections.Generic;
 using MTM101BaldAPI;
+using BBCRAdds.Extensions;
 
 namespace BBCRAdds.Patches
 {
@@ -133,7 +134,7 @@ namespace BBCRAdds.Patches
 			string sData = new string(data);
 			text.text = sData + $"\nsaved: {beenSaved}\nCurrent Room Type:{(room != null ? room.name : "none")}\n Pos: {playerPos.x},{playerPos.z}";
 
-			if (Input.GetKeyDown(KeyCode.Alpha1)) // A 4-bit flag
+			if (Input.GetKeyDown(KeyCode.Alpha1)) // A 4-bit flag (for tiles)
 				data[0] = data[0] == '0' ? '1' : '0';
 			if (Input.GetKeyDown(KeyCode.Alpha2))
 				data[1] = data[1] == '0' ? '1' : '0';
@@ -144,18 +145,18 @@ namespace BBCRAdds.Patches
 
 			
 
-			if (Input.GetKeyDown(KeyCode.UpArrow))
+			if (Input.GetKeyDown(KeyCode.UpArrow)) // Switch the room inside the room list
 			{
 				roomIdx++;
 				roomIdx %= EnvironmentData.ec.rooms.Count;
 			}
-			if (Input.GetKeyDown(KeyCode.DownArrow))
+			if (Input.GetKeyDown(KeyCode.DownArrow)) // Switch the room inside the room list
 			{
 				roomIdx--;
 				roomIdx %= EnvironmentData.ec.rooms.Count;
 				if (roomIdx < 0) roomIdx = EnvironmentData.ec.rooms.Count - 1;
 			}
-			if (Input.GetKeyDown(KeyCode.C))
+			if (Input.GetKeyDown(KeyCode.C)) // Copy the current tile's room into reference
 			{
 				var r = EnvironmentData.ec.TileFromPos(playerPos);
 				if (r != null && r.room != null)
@@ -163,6 +164,32 @@ namespace BBCRAdds.Patches
 			}
 
 			room = EnvironmentData.ec.rooms[roomIdx];
+
+			if (Input.GetKeyDown(KeyCode.R)) // Creates a roomData based on the current one (to easily add it
+			{
+				var sceneObject = Singleton<CoreGameManager>.Instance.sceneObject;
+				if (sceneObject.levelAsset != null)
+				{
+					var foundRoom = sceneObject.levelAsset.rooms.Find(x => x.name.Contains(room.name));
+					if (foundRoom != default)
+					{
+						Debug.Log("Created Room!");
+						roomDatas.Add(foundRoom.CopyRoomData(true));
+					}
+				}
+			}
+
+			if (Input.GetKeyDown(KeyCode.L)) // Creates lighting at current position
+			{
+				Debug.Log("Created Lighting!");
+				lightDatas.Add(new LightSourceData()
+				{
+					prefab = null,
+					position = playerPos,
+					color = new Color(1f, 1f, 1f, 0f),
+					strength = 1
+				});
+			}
 
 
 			if (Input.GetKeyDown(KeyCode.Z)) // Create tile
@@ -223,6 +250,14 @@ namespace BBCRAdds.Patches
 		readonly static char[] data = new char[4] {'0', '0', '0', '0'};
 
 		readonly static Vector3 pos = Vector3.up * 175f;
+
+
+
+		// Here is the storage of references, it'll basically create the necessary stuff such as room datas for example and store them in lists, so I can access through UE
+
+		readonly static List<RoomData> roomDatas = new List<RoomData>();
+
+		readonly static List<LightSourceData> lightDatas = new List<LightSourceData>();
 	}
 
 	[HarmonyPatch(typeof(ClassicLoadScreen), "OnEnable")] // TO-DO: Remove this aswell when data loads through initialization

@@ -284,6 +284,28 @@ namespace BBCRAdds.Extensions
 			return vec;
 		}
 
+		/// <summary>
+		/// Converts a string array into a Color, must be an array of length 4, each item represents an axis of it
+		/// </summary>
+		/// <param name="nums"></param>
+		/// <returns></returns>
+		public static Color ToColor(this string[] nums)
+		{
+			if (nums.Length != 4) return default;
+			Color vec = default;
+
+			if (float.TryParse(nums[0], out float res))
+				vec.r = res;
+			if (float.TryParse(nums[1], out res))
+				vec.g = res;
+			if (float.TryParse(nums[2], out res))
+				vec.b = res;
+			if (float.TryParse(nums[3], out res))
+				vec.a = res;
+
+			return vec;
+		}
+
 		public static RoomData CopyRoomData(this RoomData tarRoom, bool cloneActivity = false) // This boolean will never be used in code, it's for when I add rooms inside the game, so I don't have to search for the activity aswell
 		{
 			return new RoomData

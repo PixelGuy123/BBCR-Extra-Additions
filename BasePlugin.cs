@@ -47,10 +47,8 @@ namespace BBCRAdds.BepInEx
 				Logger.LogInfo($"Here\'s the binary 0111 in int: {Convert.ToInt32("0111", 2)}");
 			}
 
-
 		}
 	}
-
 
 	internal static class ModInfo
 	{
